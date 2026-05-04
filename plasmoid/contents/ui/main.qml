@@ -12,6 +12,9 @@ PlasmoidItem {
     id: root
 
     Plasmoid.icon: "audio-headphones"
+    Plasmoid.status: serviceWatcher.registered && root.hasConnectedDevice
+        ? PlasmaCore.Types.ActiveStatus
+        : PlasmaCore.Types.HiddenStatus
 
     preferredRepresentation: compactRepresentation
     switchWidth: Kirigami.Units.gridUnit * 12
@@ -75,6 +78,16 @@ PlasmoidItem {
     property string selectedDevice: ""
     property var currentDevice: devices[selectedDevice] || null
     property int connectedCount: 0
+    property bool hasConnectedDevice: {
+        if (connectedCount > 0) return true
+
+        for (var address in devices) {
+            if (devices[address]?.connected) {
+                return true
+            }
+        }
+        return false
+    }
 
     function syncFromProperties() {
         if (!managerProps.properties) {
