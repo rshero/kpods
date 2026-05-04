@@ -465,7 +465,7 @@ impl ManagerActor {
             self.handle_bluetooth_connected(addr).await;
          },
          ManagerCommand::BluetoothDisconnected(addr) => {
-            self.handle_bluetooth_disconnected(addr);
+            self.handle_bluetooth_disconnected(addr).await;
          },
          ManagerCommand::AAPConnected(addr) => {
             self.handle_aap_connected(addr);
@@ -474,7 +474,7 @@ impl ManagerActor {
             self.handle_aap_disconnected(addr, is_error);
          },
          ManagerCommand::DeviceLost(addr) => {
-            self.handle_device_lost(addr);
+            self.handle_device_lost(addr).await;
          },
          ManagerCommand::EstablishAAP(addr, reply) => {
             let result = self.establish_aap_connection(addr).await;
@@ -497,7 +497,11 @@ impl ManagerActor {
             let _ = reply.send(states);
          },
          ManagerCommand::CountDevices(reply) => {
-            let count = self.devices.len() as u32;
+            let count = self
+               .devices
+               .values()
+               .filter(|device| device.device.is_connected())
+               .count() as u32;
             let _ = reply.send(count);
          },
       }
@@ -690,8 +694,8 @@ impl ManagerActor {
       }
    }
 
-   fn handle_bluetooth_disconnected(&mut self, addr: Address) {
-      if let Some(device) = self.devices.get_mut(&addr) {
+   async fn handle_bluetooth_disconnected(&mut self, addr: Address) {
+      let disconnected = if let Some(device) = self.devices.get_mut(&addr) {
          device.bluetooth_state = BluetoothState::Disconnected;
 
          // Clean up AAP connection
@@ -700,12 +704,21 @@ impl ManagerActor {
          }
          device.aap_state = AAPState::Disconnected;
 
-         self
-            .event_tx
-            .emit(&device.device, AirPodsEvent::DeviceDisconnected);
-      }
+         Some((device.device.clone(), device.device.is_connected()))
+      } else {
+         None
+      };
 
       self.aap_connecting.remove(&addr);
+
+      if let Some((device, was_connected)) = disconnected {
+         device.disconnect().await;
+         if was_connected {
+            self
+               .event_tx
+               .emit(&device, AirPodsEvent::DeviceDisconnected);
+         }
+      }
    }
 
    fn handle_aap_connected(&mut self, addr: Address) {
@@ -749,8 +762,12 @@ impl ManagerActor {
       self.aap_connecting.remove(&addr);
    }
 
-   fn handle_device_lost(&mut self, addr: Address) {
-      if let Some(device) = self.devices.remove(&addr) {
+   async fn handle_device_lost(&mut self, addr: Address) {
+      if let Some(mut device) = self.devices.remove(&addr) {
+         if let Some(handle) = device.aap_handle.take() {
+            handle.abort();
+         }
+         device.device.disconnect().await;
          self
             .event_tx
             .emit(&device.device, AirPodsEvent::DeviceDisconnected);

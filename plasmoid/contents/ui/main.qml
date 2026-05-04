@@ -12,9 +12,7 @@ PlasmoidItem {
     id: root
 
     Plasmoid.icon: "audio-headphones"
-    Plasmoid.status: serviceWatcher.registered && root.hasConnectedDevice
-        ? PlasmaCore.Types.ActiveStatus
-        : PlasmaCore.Types.HiddenStatus
+    Plasmoid.status: root.targetPlasmoidStatus
 
     preferredRepresentation: compactRepresentation
     switchWidth: Kirigami.Units.gridUnit * 12
@@ -38,6 +36,7 @@ PlasmoidItem {
                 devices = {}
                 selectedDevice = ""
                 connectedCount = 0
+                applyPlasmoidStatus()
             }
         }
     }
@@ -64,11 +63,22 @@ PlasmoidItem {
             }
 
 
-            // ConnectedCount is a DBus.UINT32, extract its value
-            if (changed.ConnectedCount?.value != null) {
-                connectedCount = changed.ConnectedCount.value
+            const changedConnectedCount = unwrapDBusValue(changed.ConnectedCount, null)
+            if (changedConnectedCount != null) {
+                connectedCount = changedConnectedCount
+                applyPlasmoidStatus()
+            } else if (invalidated.indexOf("ConnectedCount") !== -1) {
+                managerProps.updateAll()
             }
         }
+    }
+
+    Timer {
+        id: stateRefreshTimer
+        interval: 2000
+        repeat: true
+        running: serviceWatcher.registered
+        onTriggered: managerProps.updateAll()
     }
 
     // ------------------------------------------------------------------
@@ -88,6 +98,24 @@ PlasmoidItem {
         }
         return false
     }
+    property int targetPlasmoidStatus: serviceWatcher.registered && root.hasConnectedDevice
+        ? PlasmaCore.Types.ActiveStatus
+        : PlasmaCore.Types.HiddenStatus
+
+    onTargetPlasmoidStatusChanged: applyPlasmoidStatus()
+
+    function applyPlasmoidStatus() {
+        if (Plasmoid.status !== targetPlasmoidStatus)
+            Plasmoid.status = targetPlasmoidStatus
+    }
+
+    function unwrapDBusValue(value, fallbackValue) {
+        if (value == null)
+            return fallbackValue
+        if (value.value != null)
+            return value.value
+        return value
+    }
 
     function syncFromProperties() {
         if (!managerProps.properties) {
@@ -96,11 +124,10 @@ PlasmoidItem {
         }
 
         const props = managerProps.properties
-        let raw = props.Devices
+        let raw = unwrapDBusValue(props.Devices, "[]")
         let list = []
         try {
             list = JSON.parse(raw || "[]")
-            console.log("Parsed devices:", list.length, "devices")
         } catch (e) {
             console.error("Failed to parse devices:", e)
             list = []
@@ -108,10 +135,12 @@ PlasmoidItem {
 
         updateDevicesList(list)
 
-        // ConnectedCount is a DBus.UINT32, so we need to access its value property
-        if (props.ConnectedCount?.value != null) {
-            connectedCount = props.ConnectedCount.value
+        const propertyConnectedCount = unwrapDBusValue(props.ConnectedCount, null)
+        if (propertyConnectedCount != null) {
+            connectedCount = propertyConnectedCount
         }
+
+        applyPlasmoidStatus()
     }
 
     // ------------------------------------------------------------------
