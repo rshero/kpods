@@ -105,16 +105,13 @@ impl fmt::Debug for AirPods {
    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceKind {
+   #[default]
    AirPods,
-   Nothing { model: NothingModel },
-}
-
-impl Default for DeviceKind {
-   fn default() -> Self {
-      Self::AirPods
-   }
+   Nothing {
+      model: NothingModel,
+   },
 }
 
 impl DeviceKind {

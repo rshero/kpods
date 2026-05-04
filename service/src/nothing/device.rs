@@ -173,10 +173,7 @@ pub async fn connect(
                         continue;
                      }
 
-                     info!(
-                        "Nothing/CMF protocol responded on RFCOMM channel {}",
-                        channel
-                     );
+                     info!("Nothing/CMF protocol responded on RFCOMM channel {channel}");
                      request_initial_state(&state, &sender).await;
 
                      for frame in frames {
@@ -197,10 +194,7 @@ pub async fn connect(
                      last_err = Some(e);
                   },
                   Err(_) => {
-                     debug!(
-                        "No Nothing/CMF protocol response on RFCOMM channel {}",
-                        channel
-                     );
+                     debug!("No Nothing/CMF protocol response on RFCOMM channel {channel}");
                      last_err = Some(AirPodsError::RequestTimeout);
                   },
                }
@@ -296,12 +290,8 @@ fn start_packet_processor(
          match rx.recv().await {
             Ok(packet) => {
                for frame in framer.push(&packet) {
-                  let Some(device) = device.upgrade() else {
-                     return None;
-                  };
-                  let Some(state) = state.upgrade() else {
-                     return None;
-                  };
+                  let device = device.upgrade()?;
+                  let state = state.upgrade()?;
                   process_frame(&device, &state, frame, &event_tx);
                }
             },

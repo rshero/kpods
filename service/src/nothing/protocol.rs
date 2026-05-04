@@ -188,7 +188,7 @@ pub fn anc_level_to_mode(level: u8) -> Option<NoiseControlMode> {
    Some(match level {
       1 => NoiseControlMode::Off,
       2 => NoiseControlMode::Transparency,
-      3 | 4 | 5 => NoiseControlMode::Active,
+      3..=5 => NoiseControlMode::Active,
       6 => NoiseControlMode::Adaptive,
       _ => return None,
    })
