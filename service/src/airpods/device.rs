@@ -39,6 +39,7 @@ use crate::{
    bluetooth::l2cap::{self, L2CapReceiver, L2CapSender, Packet},
    error::{AirPodsError, Result},
    event::{AirPodsEvent, EventSender},
+   nothing,
 };
 
 /// Internal state for an active L2CAP connection.
@@ -54,20 +55,28 @@ impl Drop for ConnectionState {
    }
 }
 
+#[derive(Debug)]
+enum ActiveConnection {
+   AirPods(ConnectionState),
+   Nothing(nothing::device::NothingConnectionState),
+}
+
 /// Internal shared state for an `AirPods` device.
 #[derive(Debug, Default)]
 struct AirPodsInner {
    address: Address,
    address_str: SmolStr,
    name: parking_lot::Mutex<SmolStr>,
+   kind: DeviceKind,
    battery: AtomicCell<Option<BatteryInfo>>,
    is_connected: AtomicBool,
    ear_detection: AtomicCell<Option<EarDetectionStatus>>,
    noise_mode: AtomicCell<Option<NoiseControlMode>>,
    features: FeatureBitmap,
    features_present: FeatureBitmap,
-   conn: RwLock<Option<ConnectionState>>,
+   conn: RwLock<Option<ActiveConnection>>,
    battery_tracker: parking_lot::Mutex<BatteryTracker>,
+   nothing: Arc<nothing::device::NothingState>,
 }
 
 /// Represents a connected `AirPods` device.
@@ -96,6 +105,67 @@ impl fmt::Debug for AirPods {
    }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceKind {
+   AirPods,
+   Nothing { model: NothingModel },
+}
+
+impl Default for DeviceKind {
+   fn default() -> Self {
+      Self::AirPods
+   }
+}
+
+impl DeviceKind {
+   pub const fn protocol(self) -> &'static str {
+      match self {
+         Self::AirPods => "airpods_aap",
+         Self::Nothing { .. } => "nothing_spp",
+      }
+   }
+
+   pub const fn vendor(self) -> &'static str {
+      match self {
+         Self::AirPods => "apple",
+         Self::Nothing { .. } => "nothing",
+      }
+   }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NothingModel {
+   CmfHeadphonePro,
+   Generic,
+}
+
+impl NothingModel {
+   pub fn from_name(name: &str) -> Option<Self> {
+      let name = name.to_ascii_lowercase();
+      if name.contains("cmf headphone pro") {
+         Some(Self::CmfHeadphonePro)
+      } else if name.contains("nothing") || name.contains("cmf") {
+         Some(Self::Generic)
+      } else {
+         None
+      }
+   }
+
+   pub const fn model_base(self) -> &'static str {
+      match self {
+         Self::CmfHeadphonePro => "B175",
+         Self::Generic => "unknown",
+      }
+   }
+
+   pub const fn display_name(self) -> &'static str {
+      match self {
+         Self::CmfHeadphonePro => "CMF Headphone Pro",
+         Self::Generic => "Nothing/CMF Device",
+      }
+   }
+}
+
 /// Represents the result of an update operation on device state.
 #[derive(Debug, Clone, Copy)]
 pub enum UpdateOp<T> {
@@ -110,7 +180,7 @@ pub enum UpdateOp<T> {
 }
 
 impl<T: PartialEq> UpdateOp<T> {
-   fn apply_atomic(dst: &AtomicCell<Option<T>>, new: Option<T>) -> Self
+   pub(crate) fn apply_atomic(dst: &AtomicCell<Option<T>>, new: Option<T>) -> Self
    where
       T: Copy,
    {
@@ -127,7 +197,7 @@ impl<T: PartialEq> UpdateOp<T> {
       }
    }
 
-   const fn is_updated(&self) -> bool {
+   pub(crate) const fn is_updated(&self) -> bool {
       matches!(self, Self::Inserted | Self::Updated(_))
    }
 }
@@ -135,11 +205,22 @@ impl<T: PartialEq> UpdateOp<T> {
 impl AirPods {
    /// Creates a new `AirPods` device instance.
    pub fn new(address: Address, name: String, battery_study: Option<BatteryStudy>) -> Self {
+      Self::new_with_kind(address, name, DeviceKind::AirPods, battery_study)
+   }
+
+   pub fn new_with_kind(
+      address: Address,
+      name: String,
+      kind: DeviceKind,
+      battery_study: Option<BatteryStudy>,
+   ) -> Self {
       Self(Arc::new(AirPodsInner {
          address,
          address_str: address.to_smolstr(),
          name: parking_lot::Mutex::new(name.into()),
+         kind,
          battery_tracker: parking_lot::Mutex::new(BatteryTracker::new(battery_study)),
+         nothing: Arc::new(nothing::device::NothingState::default()),
          ..Default::default()
       }))
    }
@@ -152,6 +233,10 @@ impl AirPods {
    /// Gets the address string of the Airpod.
    pub fn address_str(&self) -> &SmolStr {
       &self.0.address_str
+   }
+
+   pub fn kind(&self) -> DeviceKind {
+      self.0.kind
    }
 
    /// Gets the name of the Airpod.
@@ -218,7 +303,15 @@ impl AirPods {
           "address": self.address_str().as_str(),
           "name": self.name().as_str(),
           "connected": self.is_connected(),
+          "vendor": self.kind().vendor(),
+          "protocol": self.kind().protocol(),
       });
+
+      if let DeviceKind::Nothing { model } = self.kind() {
+         info["model"] = json!(model.display_name());
+         info["model_base"] = json!(model.model_base());
+         info["nothing"] = self.0.nothing.to_json();
+      }
 
       if let Some(battery) = self.battery_info() {
          info["battery"] = battery.to_json();
@@ -269,9 +362,19 @@ impl AirPods {
    ///
    /// Returns a join handle that resolves when the connection is closed.
    pub async fn connect(&self, event_tx: &EventSender) -> Result<JoinHandle<Option<AirPodsError>>> {
-      info!("Connecting to AirPods at {}", self.address());
       let mut conn = self.0.conn.write().await;
       let _ = conn.take();
+
+      if matches!(self.kind(), DeviceKind::Nothing { .. }) {
+         let (nothing_conn, jhandle) =
+            nothing::device::connect(self, self.0.nothing.clone(), event_tx).await?;
+         *conn = Some(ActiveConnection::Nothing(nothing_conn));
+         self.0.is_connected.store(true, Ordering::Relaxed);
+         info!("Successfully connected to {}", self.address());
+         return Ok(jhandle);
+      }
+
+      info!("Connecting to AirPods at {}", self.address());
 
       // Create L2CAP connection
       let mut jset = JoinSet::new();
@@ -283,7 +386,7 @@ impl AirPods {
       let jhandle = self.start_packet_processor(receiver, event_tx.clone());
 
       // Store connection state
-      *conn = Some(ConnectionState { sender, jset });
+      *conn = Some(ActiveConnection::AirPods(ConnectionState { sender, jset }));
       self.0.is_connected.store(true, Ordering::Relaxed);
 
       // Initialize battery study session
@@ -306,7 +409,7 @@ impl AirPods {
       info!("Disconnected from {}", self.address());
    }
 
-   async fn notify_disconnected(&self, event_tx: &EventSender) {
+   pub async fn notify_transport_disconnected(&self, event_tx: &EventSender) {
       // Save battery study data before disconnecting
       self.save_battery_study();
 
@@ -420,7 +523,7 @@ impl AirPods {
                },
                Err(e) => {
                   if let Some(this) = weak.upgrade() {
-                     this.notify_disconnected(&event_tx).await;
+                     this.notify_transport_disconnected(&event_tx).await;
                   } else {
                      warn!("{addr}: Connection closed: {e:?}");
                   }
@@ -435,39 +538,97 @@ impl AirPods {
 
    pub async fn set_noise_control(&self, mode: NoiseControlMode) -> Result<()> {
       let conn = self.0.conn.read().await;
-      if let Some(conn) = conn.as_ref() {
-         let packet = build_control_packet(0x0D, (mode as u32).to_le_bytes());
-         conn.sender.send(&packet).await?;
-         self.0.noise_mode.store(Some(mode));
-         Ok(())
-      } else {
-         Err(AirPodsError::DeviceNotConnected)
+      match conn.as_ref() {
+         Some(ActiveConnection::AirPods(conn)) => {
+            let packet = build_control_packet(0x0D, (mode as u32).to_le_bytes());
+            conn.sender.send(&packet).await?;
+            self.0.noise_mode.store(Some(mode));
+            Ok(())
+         },
+         Some(ActiveConnection::Nothing(conn)) => {
+            nothing::device::set_noise_control(&self.0.nothing, &conn.sender, mode).await?;
+            self.0.noise_mode.store(Some(mode));
+            Ok(())
+         },
+         None => Err(AirPodsError::DeviceNotConnected),
       }
    }
 
    pub async fn passthrough(&self, packet: &[u8]) -> Result<()> {
       let conn = self.0.conn.read().await;
-      if let Some(conn) = conn.as_ref() {
-         conn.sender.send(packet).await?;
-         Ok(())
-      } else {
-         Err(AirPodsError::DeviceNotConnected)
+      match conn.as_ref() {
+         Some(ActiveConnection::AirPods(conn)) => {
+            conn.sender.send(packet).await?;
+            Ok(())
+         },
+         Some(ActiveConnection::Nothing(conn)) => {
+            conn.sender.send(packet).await?;
+            Ok(())
+         },
+         None => Err(AirPodsError::DeviceNotConnected),
+      }
+   }
+
+   pub async fn set_nothing_anc_level(&self, level: u8) -> Result<()> {
+      let conn = self.0.conn.read().await;
+      match conn.as_ref() {
+         Some(ActiveConnection::Nothing(conn)) => {
+            nothing::device::set_anc_level(&self.0.nothing, &conn.sender, level).await?;
+            if let Some(mode) = nothing::protocol::anc_level_to_mode(level) {
+               self.0.noise_mode.store(Some(mode));
+            }
+            Ok(())
+         },
+         Some(ActiveConnection::AirPods(_)) => Err(AirPodsError::FeatureNotSupported(
+            "Nothing/CMF ANC levels are not supported by AirPods".to_string(),
+         )),
+         None => Err(AirPodsError::DeviceNotConnected),
+      }
+   }
+
+   pub async fn set_nothing_eq_preset(&self, preset: u8) -> Result<()> {
+      let conn = self.0.conn.read().await;
+      match conn.as_ref() {
+         Some(ActiveConnection::Nothing(conn)) => {
+            nothing::device::set_eq_preset(&self.0.nothing, &conn.sender, preset).await
+         },
+         Some(ActiveConnection::AirPods(_)) => Err(AirPodsError::FeatureNotSupported(
+            "Nothing/CMF EQ presets are not supported by AirPods".to_string(),
+         )),
+         None => Err(AirPodsError::DeviceNotConnected),
+      }
+   }
+
+   pub async fn set_nothing_ring(&self, enabled: bool) -> Result<()> {
+      let conn = self.0.conn.read().await;
+      match conn.as_ref() {
+         Some(ActiveConnection::Nothing(conn)) => {
+            nothing::device::set_ring(&self.0.nothing, &conn.sender, enabled).await
+         },
+         Some(ActiveConnection::AirPods(_)) => Err(AirPodsError::FeatureNotSupported(
+            "Nothing/CMF ring is not supported by AirPods".to_string(),
+         )),
+         None => Err(AirPodsError::DeviceNotConnected),
       }
    }
 
    pub async fn set_feature(&self, feature: FeatureId, enabled: bool) -> Result<()> {
       let conn = self.0.conn.read().await;
-      if let Some(conn) = conn.as_ref() {
-         let packet = if enabled {
-            FeatureCmd::Enable.build(feature.id())
-         } else {
-            FeatureCmd::Disable.build(feature.id())
-         };
-         conn.sender.send(&packet).await?;
-         self.set_feature_enabled(feature, enabled);
-         Ok(())
-      } else {
-         Err(AirPodsError::DeviceNotConnected)
+      match conn.as_ref() {
+         Some(ActiveConnection::AirPods(conn)) => {
+            let packet = if enabled {
+               FeatureCmd::Enable.build(feature.id())
+            } else {
+               FeatureCmd::Disable.build(feature.id())
+            };
+            conn.sender.send(&packet).await?;
+            self.set_feature_enabled(feature, enabled);
+            Ok(())
+         },
+         Some(ActiveConnection::Nothing(_)) => Err(AirPodsError::FeatureNotSupported(
+            "AirPods feature bitmap is not supported by Nothing/CMF devices".to_string(),
+         )),
+         None => Err(AirPodsError::DeviceNotConnected),
       }
    }
 
@@ -581,7 +742,8 @@ impl AirPods {
          .estimate_ttl(&battery, mode, self.address())
          .or_else(|| {
             // Default to 16.9%/hr drain rate if no estimate available
-            let min_level = f64::from(battery.left.level.min(battery.right.level));
+            let (left, right) = battery.split_ref();
+            let min_level = f64::from(left.level.min(right.level));
             let hours_remaining = min_level / DEFAULT_DRAIN_RATE;
             Some((hours_remaining * 60.0) as u32)
          })

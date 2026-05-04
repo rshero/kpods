@@ -42,7 +42,7 @@ Card {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignCenter
                     visible: !!device?.battery?.headphone
-                    label: i18n("MX")
+                    label: device?.vendor === "nothing" ? i18n("HP") : i18n("MX")
                     level: device?.battery?.headphone?.level ?? 0
                     charging: !!device?.battery?.headphone?.charging
                     size: Kirigami.Units.gridUnit * 3.5

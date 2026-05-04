@@ -14,28 +14,17 @@ Item {
 
     signal deviceSelected(address: string)
     signal noiseControlChanged(mode: string)
+    signal nothingAncLevelChanged(level: int)
+    signal nothingEqPresetChanged(preset: int)
+    signal nothingRingToggled(enabled: bool)
     signal featureToggled(feature: string, enabled: bool)
     signal refreshRequested()
 
     width: Kirigami.Units.gridUnit * 24
     height: Kirigami.Units.gridUnit * 32
-
-    // Gradient background with multiple layers for depth
-    Rectangle {
-        anchors.fill: parent
-        color: Kirigami.ColorUtils.adjustColor(
-            Kirigami.Theme.backgroundColor,
-            {"value": -10}
-        )
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0.1, 0.1, 0.15, 0.3) }
-            GradientStop { position: 1.0; color: Qt.rgba(0.05, 0.05, 0.1, 0.5) }
-        }
-    }
+    readonly property real scrollBarReserve: currentDevice && currentDevice.connected && deviceScrollView
+        ? Math.max(0, deviceScrollView.width - deviceScrollView.availableWidth)
+        : 0
 
     ColumnLayout {
         anchors.fill: parent
@@ -58,6 +47,7 @@ Item {
         // Device selector card - only show if multiple devices
         Card {
             Layout.fillWidth: true
+            Layout.rightMargin: root.scrollBarReserve
             title: i18n("Device")
             showTitle: false
             implicitHeight: Object.keys(devices).length != 1 ? Kirigami.Units.gridUnit * 2.5 : Kirigami.Units.gridUnit * 2
@@ -161,25 +151,47 @@ Item {
                 NumberAnimation { duration: 300 }
             }
 
-            ColumnLayout {
+            ScrollView {
+                id: deviceScrollView
                 anchors.fill: parent
-                anchors.bottomMargin: Kirigami.Units.largeSpacing * 2
-                spacing: Kirigami.Units.largeSpacing
                 visible: parent.opacity > 0
+                clip: true
 
-                // Battery status
-                BatteryStatus {
-                    Layout.fillWidth: true
-                    device: currentDevice
-                }
+                ColumnLayout {
+                    width: Math.max(0, deviceScrollView.availableWidth)
+                    spacing: Kirigami.Units.largeSpacing
 
-                // Noise control
-                NoiseControlPanel {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    currentMode: currentDevice && currentDevice.noise_mode ? currentDevice.noise_mode : "off"
-                    onModeChanged: function(mode) {
-                        noiseControlChanged(mode)
+                    // Battery status
+                    BatteryStatus {
+                        Layout.fillWidth: true
+                        device: currentDevice
+                    }
+
+                    CmfHeadphonePanel {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: visible ? implicitHeight : 0
+                        visible: currentDevice?.vendor === "nothing"
+                        device: currentDevice
+                        onAncLevelChanged: function(level) {
+                            nothingAncLevelChanged(level)
+                        }
+                        onEqPresetChanged: function(preset) {
+                            nothingEqPresetChanged(preset)
+                        }
+                        onRingToggled: function(enabled) {
+                            nothingRingToggled(enabled)
+                        }
+                    }
+
+                    // Noise control
+                    NoiseControlPanel {
+                        Layout.fillWidth: true
+                        visible: currentDevice?.vendor !== "nothing"
+                        Layout.preferredHeight: visible ? Kirigami.Units.gridUnit * 10 : 0
+                        currentMode: currentDevice && currentDevice.noise_mode ? currentDevice.noise_mode : "off"
+                        onModeChanged: function(mode) {
+                            noiseControlChanged(mode)
+                        }
                     }
                 }
             }

@@ -1011,6 +1011,7 @@ dependencies = [
  "heapless",
  "heed",
  "hex",
+ "libc",
  "log",
  "parking_lot",
  "rand",

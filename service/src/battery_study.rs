@@ -880,7 +880,10 @@ mod tests {
    fn create_test_db() -> Result<(BatteryStudy, TempDir)> {
       let temp_dir = TempDir::new().unwrap();
       unsafe {
-         std::env::set_var("HOME", temp_dir.path());
+         std::env::set_var(
+            "AIRPODS_BATTERY_DB_PATH",
+            temp_dir.path().join("battery_study.db"),
+         );
       }
       let manager = BatteryStudy::open()?;
       Ok((manager, temp_dir))

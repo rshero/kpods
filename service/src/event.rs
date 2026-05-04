@@ -23,6 +23,7 @@ pub enum AirPodsEvent {
    NoiseControlChanged(NoiseControlMode),
    EarDetectionChanged(EarDetectionStatus),
    DeviceNameChanged(SmolStr),
+   DeviceInfoChanged,
 }
 
 /// Trait for implementing event emission.

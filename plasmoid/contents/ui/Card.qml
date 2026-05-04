@@ -14,38 +14,12 @@ Item {
         {"alpha": -180}
     )
     
-    // Layered shadow effect
-    Rectangle {
-        anchors.fill: parent
-        anchors.topMargin: 3
-        anchors.leftMargin: 1
-        radius: cardRadius
-        color: Qt.rgba(0, 0, 0, 0.08)
-        z: -3
-    }
-    
-    Rectangle {
-        anchors.fill: parent
-        anchors.topMargin: 2
-        anchors.leftMargin: 0
-        radius: cardRadius
-        color: Qt.rgba(0, 0, 0, 0.12)
-        z: -2
-    }
-    
-    Rectangle {
-        anchors.fill: parent
-        anchors.topMargin: 1
-        radius: cardRadius
-        color: Qt.rgba(0, 0, 0, 0.15)
-        z: -1
-    }
-    
     // Main background
     Rectangle {
         id: background
         anchors.fill: parent
         radius: cardRadius
+        antialiasing: true
         color: backgroundColor
         
         // Subtle border
@@ -60,6 +34,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 1
             radius: parent.radius - 1
+            antialiasing: true
             color: "transparent"
             border.width: 1
             border.color: Kirigami.ColorUtils.adjustColor(
@@ -113,13 +88,11 @@ Item {
                     Kirigami.Theme.backgroundColor, 
                     {"alpha": -150}
                 )
-                scale: 1.02
             }
         }
     ]
     
     transitions: Transition {
         ColorAnimation { duration: 200 }
-        NumberAnimation { properties: "scale"; duration: 200; easing.type: Easing.OutCubic }
     }
 }

@@ -20,11 +20,15 @@ use tokio::{
 };
 
 use crate::{
-   airpods::{self, device::AirPods},
+   airpods::{
+      self,
+      device::{AirPods, DeviceKind},
+   },
    battery_study::BatteryStudy,
    config::Config,
    error::{AirPodsError, Result},
    event::{AirPodsEvent, EventSender},
+   nothing,
 };
 use rand::Rng;
 
@@ -419,7 +423,7 @@ impl ManagerActor {
       for addr in addresses {
          if let Ok(device) = adapter_info.adapter.device(addr)
             && device.is_connected().await == Ok(true)
-            && self.is_airpods_device(&device).await
+            && self.identify_supported_device(&device).await.is_some()
             && !self.devices.contains_key(&addr)
          {
             // Found a connected AirPods device without AAP connection
@@ -431,13 +435,16 @@ impl ManagerActor {
       }
    }
 
-   async fn is_airpods_device(&self, device: &bluer::Device) -> bool {
+   async fn identify_supported_device(&self, device: &bluer::Device) -> Option<DeviceKind> {
       // Check known addresses
       let addr = device.address();
       if self.config.is_known_device(&addr.to_string()).is_some() {
-         return true;
+         return Some(DeviceKind::AirPods);
       }
-      airpods::recognition::is_device_airpods(device).await
+      if airpods::recognition::is_device_airpods(device).await {
+         return Some(DeviceKind::AirPods);
+      }
+      nothing::recognition::identify(device).await
    }
 
    async fn handle_command(&mut self, cmd: ManagerCommand) -> bool {
@@ -605,7 +612,7 @@ impl ManagerActor {
          return;
       }
 
-      // Verify it's an AirPods device
+      // Verify it's a supported device
       let Some(adapter_info) = self.adapters.get(&adapter_name) else {
          return;
       };
@@ -614,13 +621,13 @@ impl ManagerActor {
          return;
       };
 
-      if !self.is_airpods_device(&device).await {
+      let Some(kind) = self.identify_supported_device(&device).await else {
          return;
-      }
+      };
 
       // Only proceed if already connected by bluetoothd
       if !device.is_connected().await.unwrap_or(false) {
-         debug!("Discovered AirPods at {addr} but not connected by system");
+         debug!("Discovered supported headset at {addr} but not connected by system");
          return;
       }
 
@@ -630,10 +637,15 @@ impl ManagerActor {
          .ok()
          .flatten()
          .unwrap_or_else(|| addr.to_string());
-      info!("Found connected AirPods: {name} ({addr})");
+      info!("Found connected headset: {name} ({addr})");
 
       // Create managed device
-      let airpods = AirPods::new(addr, name, self.battery_study.clone());
+      let airpods = match kind {
+         DeviceKind::AirPods => AirPods::new(addr, name, self.battery_study.clone()),
+         DeviceKind::Nothing { .. } => {
+            AirPods::new_with_kind(addr, name, kind, self.battery_study.clone())
+         },
+      };
       let managed = ManagedDevice {
          device: airpods,
          bluetooth_state: BluetoothState::Connected,
@@ -659,9 +671,9 @@ impl ManagerActor {
          // Check if this is a newly connected AirPods
          for (adapter_name, adapter_info) in &self.adapters {
             if let Ok(device) = adapter_info.adapter.device(addr)
-               && self.is_airpods_device(&device).await
+               && self.identify_supported_device(&device).await.is_some()
             {
-               // Discovered a new connected AirPods
+               // Discovered a new connected supported headset
                let _ = self
                   .loopback_tx
                   .send(ManagerCommand::DeviceDiscovered(addr, adapter_name.clone()))
@@ -909,7 +921,7 @@ impl ManagerActor {
             for addr in addresses {
                if let Ok(device) = adapter_info.adapter.device(addr)
                   && device.is_connected().await.unwrap_or(false)
-                  && self.is_airpods_device(&device).await
+                  && self.identify_supported_device(&device).await.is_some()
                   && !self.has_aap_connection(addr)
                {
                   // Found connected AirPods without AAP connection

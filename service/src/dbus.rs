@@ -24,6 +24,38 @@ fn to_arg_error<T: fmt::Display>(e: T) -> fdo::Error {
    fdo::Error::InvalidArgs(e.to_string())
 }
 
+fn get_u8_param(
+   params: &HashMap<String, zvariant::Value<'_>>,
+   name: &'static str,
+) -> fdo::Result<u8> {
+   let value = params
+      .get(name)
+      .ok_or_else(|| to_arg_error(format_args!("Missing '{name}' parameter")))?;
+
+   if let Ok(value) = value.downcast_ref::<u8>() {
+      return Ok(value);
+   }
+   if let Ok(value) = value.downcast_ref::<u16>() {
+      return u8::try_from(value).map_err(to_arg_error);
+   }
+   if let Ok(value) = value.downcast_ref::<u32>() {
+      return u8::try_from(value).map_err(to_arg_error);
+   }
+   if let Ok(value) = value.downcast_ref::<i16>() {
+      return u8::try_from(value).map_err(to_arg_error);
+   }
+   if let Ok(value) = value.downcast_ref::<i32>() {
+      return u8::try_from(value).map_err(to_arg_error);
+   }
+   if let Ok(value) = value.downcast_ref::<i64>() {
+      return u8::try_from(value).map_err(to_arg_error);
+   }
+
+   Err(to_arg_error(format_args!(
+      "Invalid '{name}' parameter: expected integer"
+   )))
+}
+
 #[interface(name = "org.kairpods.manager")]
 impl AirPodsService {
    async fn get_devices(&self) -> fdo::Result<String> {
@@ -107,6 +139,32 @@ impl AirPodsService {
             info!("Set feature {feature} to {enabled} for {address}");
 
             // Emit property change immediately so UI updates
+            self.devices_changed(&emitter).await?;
+         },
+
+         "set_nothing_anc_level" => {
+            let level = get_u8_param(&params, "level")?;
+            dev.set_nothing_anc_level(level).await?;
+            info!("Set Nothing/CMF ANC level to {level} for {address}");
+            self.devices_changed(&emitter).await?;
+         },
+
+         "set_nothing_eq_preset" => {
+            let preset = get_u8_param(&params, "preset")?;
+            dev.set_nothing_eq_preset(preset).await?;
+            info!("Set Nothing/CMF EQ preset to {preset} for {address}");
+            self.devices_changed(&emitter).await?;
+         },
+
+         "set_nothing_ring" => {
+            let enabled = params
+               .get("enabled")
+               .ok_or_else(|| to_arg_error("Missing 'enabled' parameter"))?
+               .downcast_ref::<bool>()
+               .map_err(|e| to_arg_error(format_args!("Invalid 'enabled' parameter: {e}")))?;
+
+            dev.set_nothing_ring(enabled).await?;
+            info!("Set Nothing/CMF ring to {enabled} for {address}");
             self.devices_changed(&emitter).await?;
          },
 

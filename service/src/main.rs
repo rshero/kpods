@@ -23,6 +23,7 @@ mod dbus;
 mod error;
 mod event;
 mod media_control;
+mod nothing;
 mod ringbuf;
 
 use crate::{airpods::device::AirPods, dbus::AirPodsServiceSignals, error::Result};
@@ -223,6 +224,13 @@ impl EventProcessor {
          AirPodsEvent::DeviceNameChanged(name) => {
             iface.device_name_changed(addr_str, &name).await?;
             // Emit property change for devices (name changed)
+            iface
+               .get_mut()
+               .await
+               .devices_changed(iface.signal_emitter())
+               .await?;
+         },
+         AirPodsEvent::DeviceInfoChanged => {
             iface
                .get_mut()
                .await

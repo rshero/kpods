@@ -5,3 +5,4 @@
 
 pub mod l2cap;
 pub mod manager;
+pub mod rfcomm;

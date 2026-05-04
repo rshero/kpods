@@ -239,6 +239,18 @@ PlasmoidItem {
                 root.sendCommand("set_noise_mode", { value: mode })
             }
 
+            onNothingAncLevelChanged: function (level) {
+                root.sendCommand("set_nothing_anc_level", { level: level })
+            }
+
+            onNothingEqPresetChanged: function (preset) {
+                root.sendCommand("set_nothing_eq_preset", { preset: preset })
+            }
+
+            onNothingRingToggled: function (enabled) {
+                root.sendCommand("set_nothing_ring", { enabled: enabled })
+            }
+
             onFeatureToggled: function (feature, enabled) {
                 root.sendCommand("set_feature", { feature: feature, enabled: enabled })
             }
