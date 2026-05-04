@@ -55,7 +55,7 @@ Item {
         Kirigami.Icon {
             id: icon
             anchors.centerIn: parent
-            width: Math.min(parent.width, parent.height) * 0.7
+            width: Math.min(parent.width, parent.height) * 0.9
             height: width
             source: "audio-headphones"
 

@@ -37,7 +37,7 @@ Item {
 
             PlasmaExtras.Heading {
                 Layout.fillWidth: true
-                text: "kAirPods"
+                text: "Kpods"
                 level: 2
                 color: Kirigami.Theme.textColor
                 font.weight: Font.Light

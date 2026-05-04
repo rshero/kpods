@@ -458,7 +458,7 @@ log_info "Installation complete!"
 echo -e "\nTo add the widget to your panel:"
 echo "1. Right-click on your Plasma panel"
 echo "2. Select 'Add Widgets'"
-echo "3. Search for 'kAirPods'"
+echo "3. Search for 'Kpods'"
 echo "4. Drag the widget to your panel"
 
 echo -e "\n${YELLOW}Important:${NC}"

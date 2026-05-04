@@ -1,4 +1,4 @@
-# kAirPods
+# Kpods
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![KDE Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)](https://kde.org/plasma-desktop/)
@@ -7,8 +7,10 @@
 
 Native **AirPods®** integration for **KDE Plasma 6** powered by a modern, low-latency Rust backend.
 
+Kpods is a fork of kAirPods with support for more devices. Currently supports Nothing devices.
+
 <p align="center">
-  <img src="screenshot.png" width="300" alt="kAirPods panel widget showing battery levels and controls"/>
+  <img src="screenshot.png" width="300" alt="Kpods panel widget showing battery levels and controls"/>
 </p>
 
 ---
@@ -106,7 +108,7 @@ sudo pacman -S base-devel pkgconf dbus bluez-libs
 
 First, pair your AirPods through KDE System Settings → Bluetooth
 
-### 2️⃣ **Install kAirPods**
+### 2️⃣ **Install Kpods**
 
 ```bash
 ./scripts/install.sh
@@ -116,7 +118,7 @@ First, pair your AirPods through KDE System Settings → Bluetooth
 
 - Right-click on your Plasma panel
 - Select "Add Widgets"
-- Search for "kAirPods"
+- Search for "Kpods"
 - Drag to panel
 
 ### 4️⃣ **Enjoy!**

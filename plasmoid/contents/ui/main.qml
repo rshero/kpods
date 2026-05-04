@@ -28,11 +28,11 @@ PlasmoidItem {
 
         onRegisteredChanged: {
             if (registered) {
-                console.log("kAirPods service is available")
+                console.log("Kpods service is available")
                 managerProps.updateAll()
                 syncAutoPlayPause()
             } else {
-                console.log("kAirPods service is not available")
+                console.log("Kpods service is not available")
                 devices = {}
                 selectedDevice = ""
                 connectedCount = 0
@@ -243,13 +243,13 @@ PlasmoidItem {
             }
 
             PlasmaComponents3.Label {
-                text: i18n("kAirPods Service Unavailable")
+                text: i18n("Kpods Service Unavailable")
                 font.bold: true
                 Layout.alignment: Qt.AlignHCenter
             }
 
             PlasmaComponents3.Label {
-                text: i18n("The kAirPods service is not installed or not running")
+                text: i18n("The Kpods service is not installed or not running")
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
                 Layout.fillWidth: true
@@ -257,7 +257,7 @@ PlasmoidItem {
             }
 
             PlasmaComponents3.Button {
-                text: i18n("Install kAirPods")
+                text: i18n("Install Kpods")
                 icon.name: "download"
                 Layout.alignment: Qt.AlignHCenter
                 onClicked: Qt.openUrlExternally("https://github.com/can1357/kAirPods")

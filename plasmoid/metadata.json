@@ -2,8 +2,8 @@
 	"KPackageStructure": "Plasma/Applet",
 	"KPlugin": {
 		"Id": "org.kairpods.plasma",
-		"Name": "kAirPods",
-		"Description": "AirPods management for KDE Plasma",
+		"Name": "Kpods",
+		"Description": "AirPods and Nothing device management for KDE Plasma",
 		"Icon": "audio-headphones",
 		"Category": "System Information",
 		"Version": "0.2.2",

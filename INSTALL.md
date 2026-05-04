@@ -86,7 +86,7 @@ This will build and install all components automatically.
 3. **Add widget to panel**
    - Right-click on your Plasma panel
    - Select "Add Widgets"
-   - Search for "kAirPods"
+   - Search for "Kpods"
    - Drag to panel
 
 ## Troubleshooting
