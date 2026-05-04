@@ -154,7 +154,21 @@ pub fn parse_firmware(payload: &[u8]) -> Option<String> {
 }
 
 pub fn parse_anc_level(payload: &[u8]) -> Option<u8> {
-   let status = *payload.get(1)?;
+   let mode_status = *payload.get(1)?;
+   if matches!(mode_status, 0x05 | 0x07) {
+      return anc_status_to_level(mode_status);
+   }
+
+   let status = if payload.get(3) == Some(&0x02) {
+      *payload.get(4)?
+   } else {
+      mode_status
+   };
+
+   anc_status_to_level(status)
+}
+
+fn anc_status_to_level(status: u8) -> Option<u8> {
    Some(match status {
       0x05 => 1,
       0x07 => 2,
@@ -202,6 +216,17 @@ pub fn anc_level_to_payload(level: u8) -> Option<[u8; 3]> {
    Some([0x01, status, 0x00])
 }
 
+pub fn anc_level_to_strength_payload(level: u8) -> Option<[u8; 3]> {
+   let status = match level {
+      3 => 0x03,
+      4 => 0x01,
+      5 => 0x02,
+      6 => 0x04,
+      _ => return None,
+   };
+   Some([0x02, status, 0x00])
+}
+
 pub fn listening_mode_payload(preset: u8) -> [u8; 2] {
    [preset, 0x00]
 }
@@ -223,5 +248,39 @@ mod tests {
       assert_eq!(frames[0].command, CMD_READ_BATTERY);
       assert_eq!(frames[0].operation_id, 7);
       assert_eq!(frames[0].payload, [1, 6, 80]);
+   }
+
+   #[test]
+   fn parse_b175_anc_reports() {
+      assert_eq!(
+         parse_anc_level(&[0x01, 0x07, 0x00, 0x02, 0x04, 0x00]),
+         Some(2)
+      );
+      assert_eq!(
+         parse_anc_level(&[0x01, 0x01, 0x00, 0x02, 0x01, 0x00]),
+         Some(4)
+      );
+      assert_eq!(
+         parse_anc_level(&[0x01, 0x02, 0x00, 0x02, 0x02, 0x00]),
+         Some(5)
+      );
+      assert_eq!(
+         parse_anc_level(&[0x01, 0x04, 0x00, 0x02, 0x04, 0x00]),
+         Some(6)
+      );
+   }
+
+   #[test]
+   fn build_b175_anc_payloads() {
+      assert_eq!(anc_level_to_payload(1), Some([0x01, 0x05, 0x00]));
+      assert_eq!(anc_level_to_payload(2), Some([0x01, 0x07, 0x00]));
+      assert_eq!(anc_level_to_payload(3), Some([0x01, 0x03, 0x00]));
+      assert_eq!(anc_level_to_payload(4), Some([0x01, 0x01, 0x00]));
+      assert_eq!(anc_level_to_payload(5), Some([0x01, 0x02, 0x00]));
+      assert_eq!(anc_level_to_payload(6), Some([0x01, 0x04, 0x00]));
+      assert_eq!(anc_level_to_strength_payload(3), Some([0x02, 0x03, 0x00]));
+      assert_eq!(anc_level_to_strength_payload(4), Some([0x02, 0x01, 0x00]));
+      assert_eq!(anc_level_to_strength_payload(5), Some([0x02, 0x02, 0x00]));
+      assert_eq!(anc_level_to_strength_payload(6), Some([0x02, 0x04, 0x00]));
    }
 }

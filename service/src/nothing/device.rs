@@ -251,6 +251,13 @@ pub async fn set_anc_level(state: &NothingState, sender: &RfcommSender, level: u
       .ok_or_else(|| AirPodsError::FeatureNotSupported(format!("ANC level {level}")))?;
    let packet = protocol::build(protocol::CMD_SET_ANC, &payload, state.next_operation_id());
    sender.send(&packet).await?;
+
+   if let Some(payload) = protocol::anc_level_to_strength_payload(level) {
+      time::sleep(Duration::from_millis(150)).await;
+      let packet = protocol::build(protocol::CMD_SET_ANC, &payload, state.next_operation_id());
+      sender.send(&packet).await?;
+   }
+
    state.update_anc_level(level);
    Ok(())
 }
