@@ -260,7 +260,7 @@ PlasmoidItem {
                 text: i18n("Install Kpods")
                 icon.name: "download"
                 Layout.alignment: Qt.AlignHCenter
-                onClicked: Qt.openUrlExternally("https://github.com/can1357/kAirPods")
+                onClicked: Qt.openUrlExternally("https://github.com/rshero/kpods")
             }
         }
 

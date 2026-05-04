@@ -27,8 +27,8 @@
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/can1357/kAirPods.git
-   cd kAirPods
+   git clone https://github.com/rshero/kpods.git
+   cd kpods
    ```
 
 2. **Build the Rust service**

@@ -8,9 +8,9 @@ authors = ["Can Boluk <me@can.ac>"]
 description = "D-Bus service for AirPods management in KDE Plasma"
 license = "GPL-3.0-or-later"
 
-homepage = "https://github.com/can1357/kAirPods"
-repository = "https://github.com/can1357/kAirPods"
-documentation = "https://github.com/can1357/kAirPods"
+homepage = "https://github.com/rshero/kpods"
+repository = "https://github.com/rshero/kpods"
+documentation = "https://github.com/rshero/kpods"
 readme = "../README.md"
 
 keywords = ["kde", "plasma", "airpods", "bluetooth", "dbus"]

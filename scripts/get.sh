@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# kAirPods Quick Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/can1357/kAirPods/master/scripts/get.sh | bash
+# Kpods Quick Installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/rshero/kpods/master/scripts/get.sh | bash
 
 set -euo pipefail
 
@@ -25,12 +25,12 @@ fi
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-log_info "kAirPods Quick Installer"
+log_info "Kpods Quick Installer"
 log_info "========================"
 
-# Check if we're already in a kAirPods repository
+# Check if we're already in a Kpods repository
 if [[ -f "./scripts/install.sh" ]] && [[ -f "./service/Cargo.toml" ]] && grep -q "kairpodsd" "./service/Cargo.toml" 2>/dev/null; then
-    log_info "Found existing kAirPods repository"
+    log_info "Found existing Kpods repository"
     log_info "Updating to latest version..."
     git pull --rebase --autostash || {
         log_warn "Failed to update repository, continuing with current version"
@@ -39,14 +39,14 @@ if [[ -f "./scripts/install.sh" ]] && [[ -f "./service/Cargo.toml" ]] && grep -q
     bash ./scripts/install.sh "$@"
 else
     # Clone repository
-    log_info "Cloning kAirPods repository..."
-    git clone --depth 1 https://github.com/can1357/kAirPods.git "$TEMP_DIR/kAirPods" || {
+    log_info "Cloning Kpods repository..."
+    git clone --depth 1 https://github.com/rshero/kpods.git "$TEMP_DIR/kpods" || {
         log_error "Failed to clone repository"
         exit 1
     }
 
     # Run installer
-    cd "$TEMP_DIR/kAirPods"
+    cd "$TEMP_DIR/kpods"
     log_info "Running installer..."
     bash ./scripts/install.sh "$@"
 fi

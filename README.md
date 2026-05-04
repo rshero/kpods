@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![KDE Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)](https://kde.org/plasma-desktop/)
-[![CI](https://github.com/can1357/kAirPods/actions/workflows/ci.yml/badge.svg)](https://github.com/can1357/kAirPods/actions/workflows/ci.yml)
+[![CI](https://github.com/rshero/kpods/actions/workflows/ci.yml/badge.svg)](https://github.com/rshero/kpods/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 
 Native **AirPods®** integration for **KDE Plasma 6** powered by a modern, low-latency Rust backend.
@@ -32,18 +32,18 @@ Kpods is a fork of kAirPods with support for more devices. Currently supports No
 ### One-liner install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/can1357/kAirPods/master/scripts/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rshero/kpods/master/scripts/get.sh | bash
 
 # With options:
-curl -fsSL https://raw.githubusercontent.com/can1357/kAirPods/master/scripts/get.sh | bash -s -- --verbose --debug
+curl -fsSL https://raw.githubusercontent.com/rshero/kpods/master/scripts/get.sh | bash -s -- --verbose --debug
 ```
 
 ### Manual install
 
 ```bash
 # Clone the repository
-git clone https://github.com/can1357/kAirPods.git
-cd kAirPods
+git clone https://github.com/rshero/kpods.git
+cd kpods
 
 # Run the automated installer
 ./scripts/install.sh
@@ -291,7 +291,7 @@ busctl --user call org.kairpods /org/kairpods/manager \
 Or with curl:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/can1357/kAirPods/master/scripts/get.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/rshero/kpods/master/scripts/get.sh | bash -s -- --uninstall
 ```
 
 ---
